@@ -87,6 +87,9 @@ String value of either business or consumer. This is used to identify which medi
 .PARAMETER LogicalSectorBytes
 unit32 value of 512 or 4096. Not recommended to change from 512. Might be useful for 4kn drives, but needs more testing. Default is 512.
 
+.PARAMETER OptimizeFFU
+Default is true. Set to false if you receive errors while applying an optimized FFU to your drive. If you don't optimize your FFU, it won't auto-expand once you image the target device!
+
 .EXAMPLE
 Command line for most people who want to create an FFU with Office and drivers and have downloaded their own ISO. This assumes you have copied this script and associated files to the C:\FFUDevelopment folder. If you need to use another drive or folder, change the -FFUDevelopment parameter (e.g. -FFUDevelopment 'D:\FFUDevelopment')
 .\BuildFFUVM.ps1 -ISOPath 'C:\path_to_iso\Windows.iso' -WindowsSKU 'Pro' -Installapps $true -InstallOffice $true -InstallDrivers $true -VMSwitchName 'Name of your VM Switch in Hyper-V' -VMHostIPAddress 'Your IP Address' -CreateCaptureMedia $true -CreateDeploymentMedia $true -BuildUSBDrive $true -verbose
@@ -128,6 +131,7 @@ param(
     [string]$FFUDevelopmentPath = 'C:\FFUDevelopment',
     [bool]$InstallApps,
     [bool]$InstallOffice,
+    [bool]$OptimizeFFU = $true,
     [Parameter(Mandatory = $false)]
     [ValidateScript({
             if ($_ -and (!(Test-Path -Path '.\Drivers') -or ((Get-ChildItem -Path '.\Drivers' -Recurse | Measure-Object -Property Length -Sum).Sum -lt 1MB))) {
@@ -363,8 +367,28 @@ Function Get-ADK {
         }
     }
     else {
-        throw "Windows ADK is not installed or the installation path could not be found."
+        Writelog "Windows ADK is not installed or the installation path could not be found. Attempting Install"
+        Install-ADK
     }
+}
+
+Function Install-ADK {
+    WriteLog 'Attempting to download and install latest ADK from Microsoft...'
+
+    #Download Sept 2023 ADK Installer
+    $adkFileURL = 'https://go.microsoft.com/fwlink/?linkid=2243390'
+    $adkFilePath = Join-Path $PSScriptRoot "adk.exe"
+    Invoke-WebRequest -Uri $adkFileURL -OutFile $adkFilePath
+    
+    try{
+        #Install ADK
+        Start-Process $adkFilePath -ArgumentList "/features OptionId.DeploymentTools /q /norestart" -Wait
+        Get-ADK
+    }
+    catch{
+        throw 'Error installing the latest ADK!'
+    }
+    
 }
 function Get-WindowsESD {
     param(
@@ -1039,11 +1063,13 @@ function New-FFU {
         Remove-Item -Path "$FFUDevelopmentPath\Mount" -Recurse -Force | Out-null
         WriteLog 'Folder removed'
     }
-    #Optimize FFU
-    WriteLog 'Optimizing FFU - This will take a few minutes, please be patient'
-    #Invoke-Process cmd "/c ""$DandIEnv"" && dism /optimize-ffu /imagefile:$FFUFile"
-    Invoke-Process cmd "/c dism /optimize-ffu /imagefile:$FFUFile"
-    WriteLog 'Optimizing FFU complete'
+    if ($OptimizeFFU) {
+        #Optimize FFU
+        WriteLog 'Optimizing FFU - This will take a few minutes, please be patient'
+        #Invoke-Process cmd "/c ""$DandIEnv"" && dism /optimize-ffu /imagefile:$FFUFile"
+        Invoke-Process cmd "/c dism /optimize-ffu /imagefile:$FFUFile"
+        WriteLog 'Optimizing FFU complete'
+    }
 
 }
 function Remove-FFUVM {
