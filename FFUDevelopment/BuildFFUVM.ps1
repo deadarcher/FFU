@@ -383,10 +383,29 @@ Function Install-ADK {
     try{
         #Install ADK
         Start-Process $adkFilePath -ArgumentList "/features OptionId.DeploymentTools /q /norestart" -Wait
-        Get-ADK
+        Install-PEAddOn
     }
     catch{
         throw 'Error installing the latest ADK!'
+    }
+    
+}
+
+Function Install-PEAddOn {
+    WriteLog 'Attempting to download and install latest Windows PE ADK Addon from Microsoft...'
+
+    #Download Sept 2023 PE ADK Add-on Installer
+    $peAddonFileURL = 'https://go.microsoft.com/fwlink/?linkid=2243391'
+    $peAddonFilePath = Join-Path $PSScriptRoot "peaddon.exe"
+    Invoke-WebRequest -Uri $peAddonFileURL -OutFile $peAddonFilePath
+    
+    try{
+        #Install PE Addon
+        Start-Process $peAddonFilePath -ArgumentList "/features OptionId.WindowsPreinstallationEnvironment /q /norestart" -Wait
+        Get-ADK
+    }
+    catch{
+        throw 'Error installing the latest PE AddOn!'
     }
     
 }
