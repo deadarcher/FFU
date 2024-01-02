@@ -900,6 +900,8 @@ Function Set-CaptureFFU {
     if (-not $ShareExists) {
         WriteLog "Creating $ShareName and giving access to $UserName"
         New-SmbShare -Name $ShareName -Path $FFUCaptureLocation -FullAccess $UserName | Out-Null
+        WriteLog "Updating security permissions on $ShareName, granting full access to user: $UserName"
+        & icacls $FFUCaptureLocation /grant ""$username"":F
         WriteLog "Share created"
     }
 
@@ -1637,6 +1639,7 @@ try {
 Catch {
     Write-Host 'Capturing FFU file failed'
     Writelog "Capturing FFU file failed with error $_"
+    Writelog "Are share and security permissions correct on the FFU share?"
     If ($InstallApps) {
         Remove-FFUVM -VMName $VMName
     }
@@ -1647,6 +1650,8 @@ Catch {
     throw $_
     
 }
+
+
 #Clean up ffu_user and Share
 If ($InstallApps) {
     try {
@@ -1659,6 +1664,8 @@ If ($InstallApps) {
         throw $_
     }
 }
+
+
 #Clean up VM or VHDX
 try {
     Remove-FFUVM
@@ -1669,6 +1676,8 @@ catch {
     Writelog "VM or vhdx cleanup failed with error $_"
     throw $_
 }
+
+
 #Create Deployment Media
 If ($CreateDeploymentMedia) {
     try {
